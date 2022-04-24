@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js"> <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="generator" content="scholpandoc">
+  <meta name="viewport" content="width=device-width">
+  
+  <title>Memory Efficient Invertible Neural Networks for 3D Photoacoustic Imaging</title>
+  <style type="text/css">code{white-space: pre;}</style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.7.1/modernizr.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/respond.js/1.4.2/respond.js"></script>
+  <link rel="stylesheet" href="https://slimgroup.slim.gatech.edu/ScholMD/standalone/slimweb-scholmd-standalone-v0.1-latest.min.css">
+</head>
+<body>
+<div class="scholmd-container">
+<div class="scholmd-main">
+<div class="scholmd-content">
+<header>
+<h1 class="scholmd-title"><p class="pull-right"><a href="midl_2022.pdf"><img src="https://slimgroup.slim.gatech.edu/ScholMD/icons/PDF_file_96.png" alt="PDF Version" width=48px height=48px /></a><a href="midl_2022.md"><img src="https://slimgroup.slim.gatech.edu/ScholMD/icons/SchMD_file_96.png" alt="Markdown Version" width=48px height=48px /></a></p>Memory Efficient Invertible Neural Networks for 3D Photoacoustic Imaging</h1>
+<div class="scholmd-author">
+<p>Rafael Orozco<sup>1</sup>, Mathias Louboutin<sup>1</sup> and Felix J. Herrmann<sup>1</sup><br />Georgia Institute of Technology<br /></p>
+</div>
+</header>
+<div class="scholmd-abstract">
+<h2 class="scholmd-abstract-title">Abstract</h2>
+<p>Photoacoustic imaging (PAI) can image high-resolution structures of clinical interest such as vascularity in cancerous tumor monitoring. When imaging human subjects, geometric restrictions force limited-view data retrieval causing imaging artifacts. Iterative physical model based approaches reduce artifacts but require prohibitively time consuming PDE solves. Machine learning (ML) has accelerated PAI by combining physical models and learned networks. However, the depth and overall power of ML methods is limited by memory intensive training. We propose using invertible neural networks (INNs) to alleviate memory pressure. We demonstrate INNs can image 3D photoacoustic volumes in the setting of limited-view, noisy, and subsampled data. The frugal constant memory usage of INNs enables us to train an arbitrary depth of learned layers on a consumer GPU with 16GB RAM.</p>
+</div>
+<!--- runninghead: INNs for 3D Photoacoustic Imaging
+
+author:
+- name: Rafael Orozco
+  email: rorozco@gatech.edu
+  affiliation: Georgia Institute of Technology
+- name: Mathias Louboutin
+  email: mlouboutin3@gatech.edu
+  affiliation: Georgia Institute of Technology
+- name: Felix J. Herrmann
+  email: felix.herrmann@gatech.edu
+  affiliation: Georgia Institute of Technology
+-->
+<h2 id="problem-statement">Problem Statement</h2>
+<p>In this work, we address the inverse problem of PAI given data <span class="math scholmd-math-inline">\(y\)</span>. This data is modeled with a linear forward model <span class="math scholmd-math-inline">\(A\)</span> which describes the propagation of a spatially varying initial acoustic wavefield <span class="math scholmd-math-inline">\(x\)</span>. 
+<span class="math scholmd-math-display" style="display: block;">\[
+\begin{equation}
+y = Ax + \varepsilon \, \, \, \, \text{with} \, \, \, \, \varepsilon \sim \mathcal{N}(0,\sigma^2 I)
+\label{eq:problem}
+\end{equation}
+\]</span>
+ <!--- In simple scenarios (most importantly full-view data), this problem is well-defined and has an analytical solution. However, --> We tackle here the realistic case of limited-view, noisy and subsampled data, which makes the inverse problem ill-posed. Multiple solutions <span class="math scholmd-math-inline">\(x\)</span> can explain the data <span class="math scholmd-math-inline">\(y\)</span>, therefore, this problem is typically solved in a variational framework where prior knowledge of the solution is incorporated by solving the minimization of the combination of an <span class="math scholmd-math-inline">\(\ell_2\)</span> data misfit <span class="math scholmd-math-inline">\(L\)</span> and a regularization term <span class="math scholmd-math-inline">\(p_{\mathrm{prior}}(x)\)</span>. The success of this formulation hinges on users carefully selecting hyperparameters by hand such as the optimization step length and the prior itself, typically a multipurpose generic prior such as TV norm. On the other hand, recent machine learning work argues that we can learn the optimal step length and even a prior. We pursue this avenue but select loop-unrolled networks since this learned method also leverages the known physics of the problem encoded in the model <span class="math scholmd-math-inline">\(A\)</span>.</p>
+<h2 id="methods">Methods</h2>
+<h3 id="loop-unrolled-networks">Loop-unrolled Networks:</h3>
+<p><span class="scholmd-citation" data-cites="hauptmann2018model">Hauptmann et al. (2018)</span> showed that known physical models can be combined with learned networks by using loop-unrolled networks. These networks emulate gradient descent where the <span class="math scholmd-math-inline">\(i^{\text{th}}\)</span> update is reformulated as the output of a learned network <span class="math scholmd-math-inline">\(\Lambda_{\theta_{i}}\)</span>: 
+<span class="math scholmd-math-display" style="display: block;">\[
+\begin{equation}
+x_{i+1}, s_{i+1} = \Lambda_{\theta_{i}}(x_{i},s_{i}, \nabla_{x}L(A,x_{i},y))
+\label{eq:learnedgd}
+\end{equation}
+\]</span>
+ where <span class="math scholmd-math-inline">\(s\)</span> is a memory variable and <span class="math scholmd-math-inline">\(\nabla_{x}L\)</span> is the gradient w.r.t the data misfit on observed data <span class="math scholmd-math-inline">\(y\)</span>. In our PAI case, <span class="math scholmd-math-inline">\(A\)</span> is a linear operator (discrete wave equation) and <span class="math scholmd-math-inline">\(L\)</span> is <span class="math scholmd-math-inline">\(\ell_2\)</span> norm data misfit so the desired gradient is <span class="math scholmd-math-inline">\(\nabla_{x}L(A,x_{i},y) = A^{\top}(Ax_{i}-y)\)</span>. Thus, each gradient will require two PDE solves: one forward and one adjoint. These wave propagations embed the known physical model into the learned approach. <span class="scholmd-citation" data-cites="hauptmann2018model">Hauptmann et al. (2018)</span> show that this method gives promising results on 3D PAI but note that they are limited to training shallow networks due to memory constraints. To improve on this method, we propose using an INN that is an invertible version of loop-unrolled networks.</p>
+<h3 id="invertible-neural-networks">Invertible Neural Networks:</h3>
+<p>Our invertible neural network (INN) is based on the work of <span class="scholmd-citation" data-cites="putzky2019rim">(Putzky et al., 2019)</span>, where they propose an invertible loop-unrolled method called invertible Recurrent Inference Machine (i-RIM). While typical loop-unrolled approaches have linear memory growth in depth <span class="scholmd-citation" data-cites="hauptmann2018model">Hauptmann et al. (2018)</span>, i-RIM has constant memory usage due to its invertible layers. A network constructed with invertible layers does not need to save intermediate activations thus trading computation cost required to recompute activations for extremely frugal memory usage. The memory gains allowed i-RIM authors to train a 480 layer model which was the state-of-the-art for the FASTMRI challenge when published . For this work, we adapt i-RIM to Julia and make our code available alongside other invertible neural networks at  <span class="scholmd-citation" data-cites="witte2020invertiblenetworks">P. Witte et al. (2020)</span>/.</p>
+<h2 id="experiments-and-results">Experiments and Results:</h2>
+<h3 id="generating-training-dataset">Generating training dataset:</h3>
+<p>We perform supervised training on ground truth photoacoustic volumes taken from the blood vessels dataset of . For each 3D volume, we simulate photoacoustic data by forward propagating an initial source at the vessels and restricting the wavefield to a planar array of receivers at the top of the volume. We then subsample this data by a factor of 4 and add 10dB SNR Gaussian noise. For wave propagation, we use Devito a highly optimized DSL <span class="scholmd-citation" data-cites="louboutin2019devito">Louboutin et al. (2019)</span> combined with JUDI <span class="scholmd-citation" data-cites="witte2019large">Witte et al. (2019)</span>. Propagating a wavefield of <span class="math scholmd-math-inline">\(10^9\)</span> voxels (100x300x300 volume for 1000 time steps) takes 35 seconds on a 4 core Intel Skylake CPU. %The adjoint propagation takes a similar time so a gradient calculation takes 80 seconds. Although comparatively low to other wave propagation software, this is long enough to prohibit the online use of these propagations during training. To solve this, We follow the prescription of <span class="scholmd-citation" data-cites="hauptmann2018model">Hauptmann et al. (2018)</span> and pre-generate a set of training samples then fully train one loop-unrolled iteration <span class="math scholmd-math-inline">\(\Lambda_{\theta_i}\)</span> at a time. %As <span class="scholmd-citation" data-cites="hauptmann2018model">Hauptmann et al. (2018)</span> explains, this training method changes our optimization from finding a end to end global minimum to instead being a greedy algorithm which finding the best possible reconstruction at each iteration.</p>
+<figure class="scholmd-float scholmd-figure" id="posterior-samples">
+<div class="scholmd-float-content"><figure class="scholmd-subfig" id="results" style="display: inline-block; width: 100%">
+<img src="figs/results.png" />
+<div class="scholmd-float-subcaption"><figcaption><span class="scholmd-caption-head"><span class="scholmd-caption-head-prefix"></span><span class="scholmd-caption-head-label">(a)</span></span></figcaption></div>
+</figure></div>
+<div class="scholmd-float-caption"><figcaption><span class="scholmd-caption-head"><span class="scholmd-caption-head-prefix">Figure</span><span class="scholmd-caption-head-label">1</span></span><span class="scholmd-caption-text">First row shows a slice through the 3D volume of: ground truth, the input to our INN (first gradient w.r.t data misfit on observed data <span class="math scholmd-math-inline">\(y\)</span>), baseline LSQR solution after 30 iterations and our final INN reconstruction after 1 loop-unrolled iteration. Second row shows maximum intensity projection (MIP) across X dimension.</span></figcaption></div>
+</figure>
+<h3 id="results-and-conclusions">Results and conclusions:</h3>
+<p>After training one loop-unrolled iteration, our INN produces a better result than the baseline purely physical model based iterative method (Figure ). For proper comparison, note that our INN result costs 2 PDE solves (<span class="math scholmd-math-inline">\(2 \times 35\)</span> seconds) and a forward pass on the trained INN (<span class="math scholmd-math-inline">\(7\)</span> seconds), while the baseline costs <span class="math scholmd-math-inline">\(60\)</span> PDE solves (<span class="math scholmd-math-inline">\(60 \times 35\)</span> seconds). During INN architecture selection, we observed that the number of layers did not affect memory usage. Thus, we demonstrated that INNs provide an accurate, memory efficient method that enables fast 3D imaging for PAI.</p>
+<div class="references">
+<p>Hauptmann, A., Lucka, F., Betcke, M., Huynh, N., Adler, J., Cox, B., … Arridge, S., 2018, Model-based learning for accelerated, limited-view 3-d photoacoustic tomography: IEEE Transactions on Medical Imaging, <strong>37</strong>, 1382–1393.</p>
+<p>Louboutin, M., Lange, M., Luporini, F., Kukreja, N., Witte, P. A., Herrmann, F. J., … Gorman, G. J., 2019, Devito (v3. 1.0): An embedded domain-specific language for finite differences and geophysical exploration: Geoscientific Model Development, <strong>12</strong>, 1165–1187.</p>
+<p>Putzky, P., Karkalousos, D., Teuwen, J., Miriakov, N., Bakker, B., Caan, M., and Welling, M., 2019, I-rIM applied to the fastMRI challenge: ArXiv Preprint ArXiv:1910.08952.</p>
+<p>Witte, P. A., Louboutin, M., Kukreja, N., Luporini, F., Lange, M., Gorman, G. J., and Herrmann, F. J., 2019, A large-scale framework for symbolic implementations of seismic inversion algorithms in julia: Geophysics, <strong>84</strong>, F57–F71.</p>
+<p>Witte, P., Rizzuti, G., Louboutin, M., Siahkoohi, A., and Herrmann, F., 2020, InvertibleNetworks. jl: A julia framework for invertible neural networks:. November.</p>
+</div>
+</div>
+</div>
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+      processClass: "math"
+    },
+    TeX: {
+        TagSide: "left",
+        TagIndent: "1.2em",
+        equationNumbers: {
+            autoNumber: "AMS"
+        },
+        Macros: {
+            ensuremath: ["#1",1],
+            textsf: ["\\mathsf{\\text{#1}}",1],
+            texttt: ["\\mathtt{\\text{#1}}",1]
+        }
+    },
+    "HTML-CSS": { 
+        scale: 100,
+        availableFonts: ["TeX"], 
+        preferredFont: "TeX",
+        webFont: "TeX",
+        imageFont: "TeX",
+        EqnChunk: 1000
+    }
+});
+</script>
+<script src="https://slimgroup.slim.gatech.edu/ScholMD/js/slimweb-scholmd-scripts.js"></script>
+<script src="https://slimgroup.slim.gatech.edu/MathJax/MathJax.js?config=TeX-AMS_HTML-full" type="text/javascript"></script>
+</div>
+</body>
+</html>
